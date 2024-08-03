@@ -24,20 +24,23 @@ class Server:
         self.rate = rate
         self.queue = deque(maxlen=maxQueueSize)
         self.maxQueueSize = maxQueueSize
-        self.lastRequestTime = 0
-        self.firstInLine=None
         
     def addRequest(self, request):
-        if len(self.queue) == self.maxQueueSize:
+        if len(self.queue) == self.maxQueueSize-1:
             if(request.arrivalTime < self.queue[0].serviceEndTime):
                 return False
-            while self.queue and request.arrivalTime >= self.queue[0].serviceEndTime:
-                self.queue.pop()
+        while self.queue and request.arrivalTime >= self.queue[0].serviceEndTime:
+            self.queue.pop()
+        if self.queue:
+            request.serviceEndTime=max(self.queue[-1].serviceEndTime,request.arrivalTime) + request.serviceTime
+        else:
+            request.serviceEndTime=request.arrivalTime + request.serviceTime
         self.queue.append(request)
-        request.serviceEndTime=request.arrivalTime
-        for i in range(len(self.queue)):
-            request.serviceEndTime+=self.queue[i].serviceTime
-        self.firstInLine=self.queue[0]
+        # request.serviceEndTime=request.arrivalTime
+        # request.serviceEndTime += (self.queue[0].serviceEndTime-request.arrivalTime) 
+        
+        # for i in range(1,len(self.queue)):
+        #     request.serviceEndTime+=self.queue[i].serviceTime
         return True
         
 
@@ -80,8 +83,6 @@ class Simulator :
 
 
     def processRequests(self):
-        sumRequestsAllTimes=0
-        currentRequestNum= 0
 
         receivedService= 0
         thrownOut= 0
@@ -96,12 +97,11 @@ class Simulator :
             
             if self.servers[req.chosenServer].addRequest(req):
                 receivedService += 1
-                sumWaitingTime += (req.serviceEndTime - req.arrivalTime - 1/self.servers[req.chosenServer].rate)
-                sumServiceTime += req.serviceTime
+                sumWaitingTime += (req.serviceEndTime - req.arrivalTime)
                 
+                sumServiceTime += req.serviceTime
             else:
                 thrownOut += 1
-                currentRequestNum -= 1
                     
         Tw=sumWaitingTime/receivedService
         Ts=sumServiceTime/receivedService
