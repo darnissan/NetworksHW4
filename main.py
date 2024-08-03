@@ -28,14 +28,15 @@ class Server:
         self.firstInLine=None
         
     def addRequest(self, request):
-        if len(self.queue) >= self.maxQueueSize:
-            if(request.arrivalTime < self.firstInLine.serviceEndTime ):
+        if len(self.queue) == self.maxQueueSize:
+            if(request.arrivalTime < self.queue[0].serviceEndTime):
                 return False
-            self.queue.pop()
+            while self.queue and request.arrivalTime >= self.queue[0].serviceEndTime:
+                self.queue.pop()
         self.queue.append(request)
         request.serviceEndTime=request.arrivalTime
         for i in range(len(self.queue)):
-            request.serviceEndTime+=1/self.queue[i].serviceTime
+            request.serviceEndTime+=self.queue[i].serviceTime
         self.firstInLine=self.queue[0]
         return True
         
@@ -65,13 +66,13 @@ class Simulator :
         for t in range(self.timeOut):
             CurrentPossionResult=np.random.poisson(self.requestsRate)
             serverRates=np.random.poisson(self.serverRates)
+           
             for CurReqIndex in range(CurrentPossionResult):
                 req= Request(t+CurReqIndex/CurrentPossionResult)
                 req.chosenServer=random.choices(list(range(len(self.probabilities))),weights=self.probabilities)[0] # note servers are indices from n to len(probabilities)-1
-                
-                req.serviceTime=serverRates[req.chosenServer]
+                req.serviceTime=1/serverRates[req.chosenServer]
                 heqpq.heappush(self.events,(req.arrivalTime,req))
-             
+                
 
     def createServers(self):
         for serv in range(self.numOfServers):
@@ -92,11 +93,12 @@ class Simulator :
             _,req=heqpq.heappop(self.events)
             self.currentTime=req.arrivalTime
             lastRequest=req
-            req.serviceTime=np.random.poisson(self.servers[req.chosenServer].rate)
+            
             if self.servers[req.chosenServer].addRequest(req):
                 receivedService += 1
                 sumWaitingTime += (req.serviceEndTime - req.arrivalTime - 1/self.servers[req.chosenServer].rate)
                 sumServiceTime += req.serviceTime
+                
             else:
                 thrownOut += 1
                 currentRequestNum -= 1
