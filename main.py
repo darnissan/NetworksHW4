@@ -1,9 +1,9 @@
 import argparse
 import sys
 import random
-import deque
+from collections import deque
 import heapq as heqpq
-
+import numpy as np
     
 
 class Request:
@@ -12,6 +12,8 @@ class Request:
         self.serviceEndTime = 0
         self.waitTime = 0
         self.lifeTime = 0
+        self.serviceTime=0
+        self.chosenServer=0
     def getArirvalTime(self):
         return self.arrivalTime
     
@@ -20,21 +22,21 @@ class Request:
 class Server:
     def __init__(self, rate,maxQueueSize):
         self.rate = rate
-        self.queue = deque.Deque(maxlen=maxQueueSize)
+        self.queue = deque(maxlen=maxQueueSize)
         self.maxQueueSize = maxQueueSize
         self.lastRequestTime = 0
         self.firstInLine=None
         
     def addRequest(self, request):
-        if self.queue.full():
+        if len(self.queue) >= self.maxQueueSize:
             if(request.arrivalTime < self.firstInLine.serviceEndTime ):
-                 return False
+                return False
             self.queue.pop()
-            self.firstInLine=self.queue[0]
-        if(self.queue.empty()):
-            self.firstInLine=request
         self.queue.append(request)
-        request.serviceEndTime =+len(self.queue) *1/self.rate + request.arrivalTime  + 1/self.rate
+        request.serviceEndTime=request.arrivalTime
+        for i in range(len(self.queue)):
+            request.serviceEndTime+=1/self.queue[i].serviceTime
+        self.firstInLine=self.queue[0]
         return True
         
 
@@ -52,57 +54,61 @@ class Simulator :
         self.timeOfLastSuccessReq=0
         self.avgWaitTimeOfSuccessReq=0
         self.AvgLifeTimeOfReq=0
-        self.events=heqpq.heapq()
+        self.events=[]
+        heqpq.heapify(self.events)
         self.servers=[]
+        self.chosenServersHistory=[0,0]
       
         
         
     def createRequests(self):
-        for serv in range(self.numOfServers):
-            servers += Server(self.serverRates[serv], self.queues[serv])
         for t in range(self.timeOut):
-            CurrentPossionResult=random.poisson(self.requestsRate)
+            CurrentPossionResult=np.random.poisson(self.requestsRate)
+            serverRates=np.random.poisson(self.serverRates)
             for CurReqIndex in range(CurrentPossionResult):
                 req= Request(t+CurReqIndex/CurrentPossionResult)
+                req.chosenServer=random.choices(list(range(len(self.probabilities))),weights=self.probabilities)[0] # note servers are indices from n to len(probabilities)-1
+                
+                req.serviceTime=serverRates[req.chosenServer]
                 heqpq.heappush(self.events,(req.arrivalTime,req))
-    def createServerTimRates
+             
+
+    def createServers(self):
+        for serv in range(self.numOfServers):
+            self.servers.append(Server(self.serverRates[serv], self.queues[serv]))
 
 
     def processRequests(self):
         sumRequestsAllTimes=0
         currentRequestNum= 0
+
         receivedService= 0
         thrownOut= 0
         lastRequest= 0
         sumWaitingTime=0
-        while self.events and self.currntTime <self.timeOut:
+        sumServiceTime=0
+        self.currentTime=0
+        while self.events and self.currentTime <self.timeOut:
             _,req=heqpq.heappop(self.events)
+            self.currentTime=req.arrivalTime
             lastRequest=req
-            chosenServer=random.choices(list(range(len(self.probabilities))),weights=self.probabilities) # note servers are indices from n to len(probabilities)-1
-            if self.servers[chosenServer].addRequest(req):
+            req.serviceTime=np.random.poisson(self.servers[req.chosenServer].rate)
+            if self.servers[req.chosenServer].addRequest(req):
                 receivedService += 1
-                sumWaitingTime += (req.serviceEndTime - req.arrivalTime - 1/self.servers[chosenServer].rate)
-                
+                sumWaitingTime += (req.serviceEndTime - req.arrivalTime - 1/self.servers[req.chosenServer].rate)
+                sumServiceTime += req.serviceTime
             else:
                 thrownOut += 1
                 currentRequestNum -= 1
                     
-        for srv in servers:
-            serverTime=0
-            for packet in range(self.maxQueueSize):
-            while serverTime <  self.timeOut: 
-                serverTime += 1/srv.rate
-                if serverTime == firstRequest.arrivalTime:
-                    receivedService += 1
-                    currentRequestNum -= 1
-                
-            
-            currentRequestNum += self.requestsRate
-            sumRequestsAllTimes += currentRequestNum  
+        Tw=sumWaitingTime/receivedService
+        Ts=sumServiceTime/receivedService
+        Tend=lastRequest.serviceEndTime
+
+        strResult = "receivedService: " + str(receivedService) + " thrownOut: " + str(thrownOut)+ " Tend: " + str(Tend) + " Tw: " + str(Tw) + " Ts: " + str(Ts)
+        return strResult
         
  
-        
-        
         
         
 def main(argc):
@@ -113,9 +119,10 @@ def main(argc):
     Queues = [int(arg) for arg in argc[3+numberOfServers:3+2*numberOfServers]]
     ServersRates = [int(arg) for arg in argc[3+2*numberOfServers:]]
     Shimon = Simulator(SimulatorTimeout,numberOfServers, ServersProbabilities, RequestsRate, Queues, ServersRates)
+    Shimon.createServers()
     Shimon.createRequests()
-    Shimon.processRequests()
-
+    result=Shimon.processRequests()
+    print("Result- ",result)
 
 
 if __name__ == "__main__":
