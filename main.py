@@ -4,7 +4,7 @@ import random
 from collections import deque
 import heapq as heqpq
 import numpy as np
-    
+
 
 class Request:
     def __init__(self, arrivalTime):
@@ -12,125 +12,116 @@ class Request:
         self.serviceEndTime = 0
         self.waitTime = 0
         self.lifeTime = 0
-        self.serviceTime=0
-        self.chosenServer=0
+        self.serviceTime = 0
+        self.chosenServer = 0
+
     def getArirvalTime(self):
         return self.arrivalTime
-    
-    
-    
+
+
 class Server:
-    def __init__(self, rate,maxQueueSize):
+    def __init__(self, rate, maxQueueSize):
         self.rate = rate
-        self.queue = deque(maxlen=maxQueueSize)
-        self.maxQueueSize = maxQueueSize
-        
+        self.queue = deque(maxlen=maxQueueSize+1)
+        self.maxQueueSize = maxQueueSize+1
+
     def addRequest(self, request):
-        if len(self.queue) == self.maxQueueSize-1:
-            if(request.arrivalTime < self.queue[0].serviceEndTime):
+        if len(self.queue) == self.maxQueueSize:
+            if (request.arrivalTime < self.queue[0].serviceEndTime):
                 return False
+            
         while self.queue and request.arrivalTime >= self.queue[0].serviceEndTime:
             self.queue.pop()
+            
         if self.queue:
-            request.serviceEndTime=max(self.queue[-1].serviceEndTime,request.arrivalTime) + request.serviceTime
+            request.serviceEndTime = self.queue[-1].serviceEndTime + request.serviceTime
+            #request.serviceEndTime = max(self.queue[-1].serviceEndTime, request.arrivalTime) + request.serviceTime
         else:
-            request.serviceEndTime=request.arrivalTime + request.serviceTime
+            request.serviceEndTime = request.arrivalTime + request.serviceTime
         self.queue.append(request)
         # request.serviceEndTime=request.arrivalTime
-        # request.serviceEndTime += (self.queue[0].serviceEndTime-request.arrivalTime) 
-        
+        # request.serviceEndTime += (self.queue[0].serviceEndTime-request.arrivalTime)
+
         # for i in range(1,len(self.queue)):
         #     request.serviceEndTime+=self.queue[i].serviceTime
         return True
-        
 
 
-class Simulator :
-    def __init__(self , simulatorTimeOut,numOfServer, probabilities, requestsRate, queues, serverRates) :
+class Simulator:
+    def __init__(self, simulatorTimeOut, numOfServer, probabilities, requestsRate, queues, serverRates):
         self.timeOut = simulatorTimeOut
-        self.numOfServers=numOfServer
+        self.numOfServers = numOfServer
         self.probabilities = probabilities
         self.requestsRate = requestsRate
+        self.currentTime = 0
         self.queues = queues
         self.serverRates = serverRates
-        self.numOfSuccessReqA=0
-        self.numOfRejectedReqB=0
-        self.timeOfLastSuccessReq=0
-        self.avgWaitTimeOfSuccessReq=0
-        self.AvgLifeTimeOfReq=0
-        self.events=[]
+        self.events = []
         heqpq.heapify(self.events)
-        self.servers=[]
-        self.chosenServersHistory=[0,0]
-      
-        
-        
+        self.servers = []
+        self.chosenServersHistory = [0, 0]
+
     def createRequests(self):
         for t in range(self.timeOut):
-            CurrentPossionResult=np.random.poisson(self.requestsRate)
-            serverRates=np.random.poisson(self.serverRates)
-           
+            CurrentPossionResult = np.random.poisson(self.requestsRate)
+            serverRates = np.random.poisson(self.serverRates)
+
             for CurReqIndex in range(CurrentPossionResult):
-                req= Request(t+CurReqIndex/CurrentPossionResult)
-                req.chosenServer=random.choices(list(range(len(self.probabilities))),weights=self.probabilities)[0] # note servers are indices from n to len(probabilities)-1
-                req.serviceTime=1/serverRates[req.chosenServer]
-                heqpq.heappush(self.events,(req.arrivalTime,req))
-                
+                req = Request(t + CurReqIndex / CurrentPossionResult)
+                req.chosenServer = random.choices(list(range(len(self.probabilities))), weights=self.probabilities)[0]  # note servers are indices from n to len(probabilities)-1
+                req.serviceTime = 1 / serverRates[req.chosenServer]
+                heqpq.heappush(self.events, (req.arrivalTime, req))
 
     def createServers(self):
         for serv in range(self.numOfServers):
             self.servers.append(Server(self.serverRates[serv], self.queues[serv]))
 
-
     def processRequests(self):
 
-        receivedService= 0
-        thrownOut= 0
-        lastRequest= 0
-        sumWaitingTime=0
-        sumServiceTime=0
-        self.currentTime=0
-        while self.events and self.currentTime <self.timeOut:
-            _,req=heqpq.heappop(self.events)
-            self.currentTime=req.arrivalTime
-            lastRequest=req
-            
+        receivedService = 0
+        thrownOut = 0
+        lastRequest = 0
+        sumWaitingTime = 0
+        sumServiceTime = 0
+        while self.events and self.currentTime < self.timeOut:
+            _, req = heqpq.heappop(self.events)
+            self.currentTime = req.arrivalTime
+            lastRequest = req
+
             if self.servers[req.chosenServer].addRequest(req):
                 receivedService += 1
                 sumWaitingTime += (req.serviceEndTime - req.arrivalTime)
-                
                 sumServiceTime += req.serviceTime
             else:
                 thrownOut += 1
-                    
-        Tw=sumWaitingTime/receivedService
-        Ts=sumServiceTime/receivedService
-        Tend=lastRequest.serviceEndTime
 
-        strResult = "receivedService: " + str(receivedService) + " thrownOut: " + str(thrownOut)+ " Tend: " + str(Tend) + " Tw: " + str(Tw) + " Ts: " + str(Ts)
+        Tw = sumWaitingTime / receivedService
+        Ts = sumServiceTime / receivedService
+        Tend = lastRequest.serviceEndTime
+
+        strResult = "receivedService: " + str(receivedService) + " thrownOut: " + str(thrownOut) + " Tend: " + str(
+            Tend) + " Tw: " + str(Tw) + " Ts: " + str(Ts)
         return strResult
-        
- 
-        
-        
+
+
 def main(argc):
     SimulatorTimeout = int(argc[0])
-    numberOfServers = int(argc[1] )
-    ServersProbabilities = [float(arg) for arg in argc[2:2+numberOfServers]]
-    RequestsRate = int(argc[2+numberOfServers])
-    Queues = [int(arg) for arg in argc[3+numberOfServers:3+2*numberOfServers]]
-    ServersRates = [int(arg) for arg in argc[3+2*numberOfServers:]]
-    Shimon = Simulator(SimulatorTimeout,numberOfServers, ServersProbabilities, RequestsRate, Queues, ServersRates)
+    numberOfServers = int(argc[1])
+    ServersProbabilities = [float(arg) for arg in argc[2:2 + numberOfServers]]
+    RequestsRate = int(argc[2 + numberOfServers])
+    Queues = [int(arg) for arg in argc[3 + numberOfServers:3 + 2 * numberOfServers]]
+    ServersRates = [int(arg) for arg in argc[3 + 2 * numberOfServers:]]
+    Shimon = Simulator(SimulatorTimeout, numberOfServers, ServersProbabilities, RequestsRate, Queues, ServersRates)
     Shimon.createServers()
     Shimon.createRequests()
-    result=Shimon.processRequests()
-    print("Result- ",result)
+    result = Shimon.processRequests()
+    print("Result- ", result)
 
 
 if __name__ == "__main__":
     breakpoint()
-    main(sys.argv[1:])   
-    
+    main(sys.argv[1:])
+
 '''
 prompt : help me to implement in python load balancer that is event driven simulator
 
@@ -188,14 +179,14 @@ class Simulator:
             if event_type == "arrival":
                 self.load_balancer.add_request(event_data)
                 self.add_event(self.current_time, "process", None)
-            
+
             elif event_type == "process":
                 result = self.load_balancer.process_request(self.current_time)
                 if result:
                     request, server = result
                     print(f"Time {self.current_time}: Request {request.id} assigned to Server {server.id}")
                     self.add_event(self.current_time + request.processing_time, "complete", server)
-                
+
             elif event_type == "complete":
                 server = event_data
                 print(f"Time {self.current_time}: Server {server.id} completed a request")
