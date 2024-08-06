@@ -24,6 +24,8 @@ class Server:
         self.rate = rate
         self.queue = deque(maxlen=maxQueueSize+1)
         self.maxQueueSize = maxQueueSize+1
+        self.currentCucle=0
+        self.currentRate=1/ np.random.poisson(self.rate)
 
     def addRequest(self, request):
         if len(self.queue) == self.maxQueueSize:
@@ -33,12 +35,19 @@ class Server:
         while self.queue and request.arrivalTime >= self.queue[0].serviceEndTime:
             self.queue.pop()
             
+        if(int(request.arrivalTime) > self.currentCucle):
+            self.currentRate= 1/ np.random.poisson(self.rate)
+            self.currentCucle=int(request.arrivalTime)
+            
+        request.serviceTime=self.currentRate
+        
         if self.queue:
             request.serviceEndTime = self.queue[-1].serviceEndTime + request.serviceTime
             #request.serviceEndTime = max(self.queue[-1].serviceEndTime, request.arrivalTime) + request.serviceTime
         else:
             request.serviceEndTime = request.arrivalTime + request.serviceTime
         self.queue.append(request)
+        #self.currentCucle=int(request.serviceEndTime)
         # request.serviceEndTime=request.arrivalTime
         # request.serviceEndTime += (self.queue[0].serviceEndTime-request.arrivalTime)
 
@@ -64,12 +73,12 @@ class Simulator:
     def createRequests(self):
         for t in range(self.timeOut):
             CurrentPossionResult = np.random.poisson(self.requestsRate)
-            serverRates = np.random.poisson(self.serverRates)
+            #serverRates = np.random.poisson(self.serverRates)
 
             for CurReqIndex in range(CurrentPossionResult):
                 req = Request(t + CurReqIndex / CurrentPossionResult)
                 req.chosenServer = random.choices(list(range(len(self.probabilities))), weights=self.probabilities)[0]  # note servers are indices from n to len(probabilities)-1
-                req.serviceTime = 1 / serverRates[req.chosenServer]
+                #req.serviceTime = 1 / serverRates[req.chosenServer]
                 heqpq.heappush(self.events, (req.arrivalTime, req))
 
     def createServers(self):
