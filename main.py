@@ -37,7 +37,6 @@ class Server:
             
         if(int(request.arrivalTime) > self.currentCucle):
             self.currentRate= 1/ np.random.poisson(self.rate)
-            self.currentCucle=int(request.arrivalTime)
             
         request.serviceTime=self.currentRate
         
@@ -47,7 +46,7 @@ class Server:
         else:
             request.serviceEndTime = request.arrivalTime + request.serviceTime
         self.queue.append(request)
-        #self.currentCucle=int(request.serviceEndTime)
+        self.currentCucle=int(request.serviceEndTime)
         # request.serviceEndTime=request.arrivalTime
         # request.serviceEndTime += (self.queue[0].serviceEndTime-request.arrivalTime)
 
