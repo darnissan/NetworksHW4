@@ -1,216 +1,131 @@
-import argparse
 import sys
 import random
-from collections import deque
-import heapq as heqpq
-import numpy as np
-    
-
-class Request:
-    def __init__(self, arrivalTime):
-        self.arrivalTime = arrivalTime
-        self.serviceEndTime = 0
-        self.waitTime = 0
-        self.lifeTime = 0
-        self.serviceTime=0
-        self.chosenServer=0
-    def getArirvalTime(self):
-        return self.arrivalTime
-    
-    
-    
-class Server:
-    def __init__(self, rate,maxQueueSize):
-        self.rate = rate
-        self.queue = deque(maxlen=maxQueueSize)
-        self.maxQueueSize = maxQueueSize
-        
-    def addRequest(self, request):
-        if len(self.queue) == self.maxQueueSize-1:
-            if(request.arrivalTime < self.queue[0].serviceEndTime):
-                return False
-        while self.queue and request.arrivalTime >= self.queue[0].serviceEndTime:
-            self.queue.pop()
-        if self.queue:
-            request.serviceEndTime=max(self.queue[-1].serviceEndTime,request.arrivalTime) + request.serviceTime
-        else:
-            request.serviceEndTime=request.arrivalTime + request.serviceTime
-        self.queue.append(request)
-        # request.serviceEndTime=request.arrivalTime
-        # request.serviceEndTime += (self.queue[0].serviceEndTime-request.arrivalTime) 
-        
-        # for i in range(1,len(self.queue)):
-        #     request.serviceEndTime+=self.queue[i].serviceTime
-        return True
-        
-
-
-class Simulator :
-    def __init__(self , simulatorTimeOut,numOfServer, probabilities, requestsRate, queues, serverRates) :
-        self.timeOut = simulatorTimeOut
-        self.numOfServers=numOfServer
-        self.probabilities = probabilities
-        self.requestsRate = requestsRate
-        self.queues = queues
-        self.serverRates = serverRates
-        self.numOfSuccessReqA=0
-        self.numOfRejectedReqB=0
-        self.timeOfLastSuccessReq=0
-        self.avgWaitTimeOfSuccessReq=0
-        self.AvgLifeTimeOfReq=0
-        self.events=[]
-        heqpq.heapify(self.events)
-        self.servers=[]
-        self.chosenServersHistory=[0,0]
-      
-        
-        
-    def createRequests(self):
-        for t in range(self.timeOut):
-            CurrentPossionResult=np.random.poisson(self.requestsRate)
-            serverRates=np.random.poisson(self.serverRates)
-           
-            for CurReqIndex in range(CurrentPossionResult):
-                req= Request(t+CurReqIndex/CurrentPossionResult)
-                req.chosenServer=random.choices(list(range(len(self.probabilities))),weights=self.probabilities)[0] # note servers are indices from n to len(probabilities)-1
-                req.serviceTime=1/serverRates[req.chosenServer]
-                heqpq.heappush(self.events,(req.arrivalTime,req))
-                
-
-    def createServers(self):
-        for serv in range(self.numOfServers):
-            self.servers.append(Server(self.serverRates[serv], self.queues[serv]))
-
-
-    def processRequests(self):
-
-        receivedService= 0
-        thrownOut= 0
-        lastRequest= 0
-        sumWaitingTime=0
-        sumServiceTime=0
-        self.currentTime=0
-        while self.events and self.currentTime <self.timeOut:
-            _,req=heqpq.heappop(self.events)
-            self.currentTime=req.arrivalTime
-            lastRequest=req
-            
-            if self.servers[req.chosenServer].addRequest(req):
-                receivedService += 1
-                sumWaitingTime += (req.serviceEndTime - req.arrivalTime)
-                
-                sumServiceTime += req.serviceTime
-            else:
-                thrownOut += 1
-                    
-        Tw=sumWaitingTime/receivedService
-        Ts=sumServiceTime/receivedService
-        Tend=lastRequest.serviceEndTime
-
-        strResult = "receivedService: " + str(receivedService) + " thrownOut: " + str(thrownOut)+ " Tend: " + str(Tend) + " Tw: " + str(Tw) + " Ts: " + str(Ts)
-        return strResult
-        
- 
-        
-        
-def main(argc):
-    SimulatorTimeout = int(argc[0])
-    numberOfServers = int(argc[1] )
-    ServersProbabilities = [float(arg) for arg in argc[2:2+numberOfServers]]
-    RequestsRate = int(argc[2+numberOfServers])
-    Queues = [int(arg) for arg in argc[3+numberOfServers:3+2*numberOfServers]]
-    ServersRates = [int(arg) for arg in argc[3+2*numberOfServers:]]
-    Shimon = Simulator(SimulatorTimeout,numberOfServers, ServersProbabilities, RequestsRate, Queues, ServersRates)
-    Shimon.createServers()
-    Shimon.createRequests()
-    result=Shimon.processRequests()
-    print("Result- ",result)
-
-
-if __name__ == "__main__":
-    breakpoint()
-    main(sys.argv[1:])   
-    
-'''
-prompt : help me to implement in python load balancer that is event driven simulator
-
 import heapq
 from collections import deque
-import random
+import numpy as np
 
-class Server:
-    def __init__(self, id):
-        self.id = id
-        self.busy_until = 0
-        self.queue
+    
 
 class Request:
-    def __init__(self, id, arrival_time, processing_time):
-        self.id = id
-        self.arrival_time = arrival_time
-        self.processing_time = processing_time
+    def __init__(self, time, event_type, server=None):
+        self.time = time
+        self.event_type = event_type
+        self.chosenServer = server
 
-class LoadBalancer:
-    def __init__(self, num_servers):
-        self.servers = [Server(i) for i in range(num_servers)]
+    def __lt__(self, other):
+        return self.time < other.time
+
+    def __eq__(self, other):
+        return self.time == other.time
+    
+class Server:
+    def __init__(self, id, queue_size, service_rate):
+        self.serverID = id
+        self.maxQueueSize = queue_size
+        self.serverServiceRate = service_rate
         self.queue = deque()
+        self.is_busy = False
+    
 
-    def add_request(self, request):
-        self.queue.append(request)
-
-    def process_request(self, current_time):
-        if not self.queue:
-            return None
-        # choose server by probabilty and check if queue is full
-        available_servers = [s for s in self.servers if s.busy_until <= current_time]
-        if not available_servers:
-            return None
-
-        request = self.queue.popleft()
-        server = min(available_servers, key=lambda s: s.busy_until)
-        server.busy_until = current_time + request.processing_time
-        return (request, server)
 
 class Simulator:
-    def __init__(self, num_servers, simulation_time):
-        self.load_balancer = LoadBalancer(num_servers)
-        self.events = []
+    def __init__(self, T, N, P, arrival_rate, Q, mu):
+        self.Timeout = T
+        self.NumberOfServers = N
+        self.ServersProbabilites = P
+        self.SimulatorArrivalRate = arrival_rate
+        self.servers = [Server(i, Q[i], mu[i]) for i in range(N)]
+        self.event_queue = []
         self.current_time = 0
-        self.simulation_time = simulation_time
-
-    def add_event(self, event_time, event_type, event_data):
-        heapq.heappush(self.events, (event_time, event_type, event_data))
+        self.requests_served = 0
+        self.requests_dropped = 0
+        self.total_wait_time = 0
+        self.total_service_time = 0
 
     def run(self):
-        while self.events and self.current_time < self.simulation_time:
-            self.current_time, event_type, event_data = heapq.heappop(self.events)
-
-            if event_type == "arrival":
-                self.load_balancer.add_request(event_data)
-                self.add_event(self.current_time, "process", None)
+        self.schedule_arrival(0)
+        
+        while self.event_queue:
+            event = heapq.heappop(self.event_queue)
+            self.current_time = event.time
             
-            elif event_type == "process":
-                result = self.load_balancer.process_request(self.current_time)
-                if result:
-                    request, server = result
-                    print(f"Time {self.current_time}: Request {request.id} assigned to Server {server.id}")
-                    self.add_event(self.current_time + request.processing_time, "complete", server)
-                
-            elif event_type == "complete":
-                server = event_data
-                print(f"Time {self.current_time}: Server {server.id} completed a request")
-                self.add_event(self.current_time, "process", None)
+            if event.event_type == "arrival":
+                self.handle_arrival()
+            elif event.event_type == "departure":
+                self.handle_departure(event.chosenServer)
+            
+            if self.current_time >= self.Timeout:
+                break
+        
+        while self.event_queue:
+            event = heapq.heappop(self.event_queue)
+            if event.event_type == "departure":
+                self.current_time = event.time
+                self.handle_departure(event.chosenServer)
 
-# Example usage
-sim = Simulator(num_servers=3, simulation_time=100)
+    def schedule_arrival(self, time):
+        if time < self.Timeout:
+            next_arrival = time + random.expovariate(self.SimulatorArrivalRate)
+            heapq.heappush(self.event_queue, Request(next_arrival, "arrival"))
 
-# Generate some sample requests
-for i in range(20): # for i in epoch (determined by T )
-                        # for j in requests in each timestep (determined by lambada)
-    arrival_time = random.randint(0, 90)
-    processing_time = random.randint(5, 15)
-    request = Request(i, arrival_time, processing_time)
-    sim.add_event(arrival_time, "arrival", request)
+    def handle_arrival(self):
+        server = self.select_server()
+        if server.is_busy:
+            if len(server.queue) < server.maxQueueSize:
+                server.queue.append(self.current_time)
+            else:
+                self.requests_dropped += 1
+        else:
+            server.is_busy = True
+            service_time =  random.expovariate(server.serverServiceRate)
+            heapq.heappush(self.event_queue, Request(self.current_time + service_time, "departure", server))
+            self.total_service_time += service_time
+        
+        self.schedule_arrival(self.current_time)
 
-sim.run()
-'''
+    def handle_departure(self, server):
+        self.requests_served += 1
+        if server.queue:
+            wait_time = self.current_time - server.queue.popleft()
+            self.total_wait_time += wait_time
+            service_time = random.expovariate(server.serverServiceRate)
+            heapq.heappush(self.event_queue, Request(self.current_time + service_time, "departure", server))
+            self.total_service_time += service_time
+        else:
+            server.is_busy = False
+
+    def select_server(self):
+        r = random.random()
+        cumulative_prob = 0
+        for i, prob in enumerate(self.ServersProbabilites):
+            cumulative_prob += prob
+            if r <= cumulative_prob:
+                return self.servers[i]
+
+    def get_results(self):
+        total_requests = self.requests_served + self.requests_dropped
+        avg_wait_time = self.total_wait_time / self.requests_served if self.requests_served > 0 else 0
+        avg_service_time = self.total_service_time / self.requests_served if self.requests_served > 0 else 0
+        return (self.requests_served, self.requests_dropped, self.current_time, avg_wait_time, avg_service_time)
+
+def main():
+    if len(sys.argv) < 7:
+        print("Usage: python simulator.py T N P1 P2 ... PN lambda Q1 Q2 ... QN mu1 mu2 ... muN")
+        sys.exit(1)
+
+    T = float(sys.argv[1])
+    N = int(sys.argv[2])
+    P = [float(x) for x in sys.argv[3:3+N]]
+    arrival_rate = float(sys.argv[3+N])
+    Q = [int(x) for x in sys.argv[4+N:4+2*N]]
+    mu = [float(x) for x in sys.argv[4+2*N:]]
+
+    simulator = Simulator(T, N, P, arrival_rate, Q, mu)
+    
+    simulator.run()
+    results = simulator.get_results()
+    
+    print(" ".join(map(str, results)))
+
+if __name__ == "__main__":
+    main()
