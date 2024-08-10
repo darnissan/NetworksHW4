@@ -2,7 +2,6 @@ import sys
 import random
 import heapq
 from collections import deque
-import numpy as np
 
     
 
