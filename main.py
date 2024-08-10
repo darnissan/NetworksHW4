@@ -61,12 +61,7 @@ class Simulator:
             if not event.isServed:
                 self.current_time = event.time
                 self.handle_departure(event.chosenServer)
-    """
-    def schedule_arrival(self, time):
-        if time < self.Timeout:
-            next_arrival = time + random.expovariate(self.SimulatorArrivalRate)
-            heapq.heappush(self.event_queue, Request(next_arrival, True))
-    """
+  
     def handle_arrival(self):
         server = self.select_server()
         if server.is_busy:
@@ -79,8 +74,7 @@ class Simulator:
             service_time =  random.expovariate(server.serverServiceRate)
             heapq.heappush(self.event_queue, Request(self.current_time + service_time, False, server))
             self.total_service_time += service_time
-        
-        #self.schedule_arrival(self.current_time)
+
         if self.current_time < self.Timeout:
             next_arrival = self.current_time + random.expovariate(self.SimulatorArrivalRate)
             heapq.heappush(self.event_queue, Request(next_arrival, True))
