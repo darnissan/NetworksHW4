@@ -2,14 +2,13 @@ import sys
 import random
 import heapq
 from collections import deque
-import numpy as np
 
     
 
 class Request:
-    def __init__(self, time, event_type, server=None):
+    def __init__(self, time, isServed, server=None):
         self.time = time
-        self.event_type = event_type
+        self.isServed= isServed
         self.chosenServer = server
 
     def __lt__(self, other):
@@ -38,20 +37,21 @@ class Simulator:
         self.event_queue = []
         self.current_time = 0
         self.requests_served = 0
-        self.requests_dropped = 0
+        self.requests_thrown  = 0
         self.total_wait_time = 0
         self.total_service_time = 0
 
     def run(self):
-        self.schedule_arrival(0)
+        first_arrival = self.current_time+ random.expovariate(self.SimulatorArrivalRate)
+        heapq.heappush(self.event_queue, Request(first_arrival, True))
         
         while self.event_queue:
             event = heapq.heappop(self.event_queue)
             self.current_time = event.time
             
-            if event.event_type == "arrival":
+            if event.isServed:
                 self.handle_arrival()
-            elif event.event_type == "departure":
+            else:
                 self.handle_departure(event.chosenServer)
             
             if self.current_time >= self.Timeout:
@@ -59,29 +59,26 @@ class Simulator:
         
         while self.event_queue:
             event = heapq.heappop(self.event_queue)
-            if event.event_type == "departure":
+            if not event.isServed:
                 self.current_time = event.time
                 self.handle_departure(event.chosenServer)
-
-    def schedule_arrival(self, time):
-        if time < self.Timeout:
-            next_arrival = time + random.expovariate(self.SimulatorArrivalRate)
-            heapq.heappush(self.event_queue, Request(next_arrival, "arrival"))
-
+  
     def handle_arrival(self):
         server = self.select_server()
         if server.is_busy:
             if len(server.queue) < server.maxQueueSize:
                 server.queue.append(self.current_time)
             else:
-                self.requests_dropped += 1
+                self.requests_thrown += 1
         else:
             server.is_busy = True
             service_time =  random.expovariate(server.serverServiceRate)
-            heapq.heappush(self.event_queue, Request(self.current_time + service_time, "departure", server))
+            heapq.heappush(self.event_queue, Request(self.current_time + service_time, False, server))
             self.total_service_time += service_time
-        
-        self.schedule_arrival(self.current_time)
+
+        if self.current_time < self.Timeout:
+            next_arrival = self.current_time + random.expovariate(self.SimulatorArrivalRate)
+            heapq.heappush(self.event_queue, Request(next_arrival, True))
 
     def handle_departure(self, server):
         self.requests_served += 1
@@ -89,7 +86,7 @@ class Simulator:
             wait_time = self.current_time - server.queue.popleft()
             self.total_wait_time += wait_time
             service_time = random.expovariate(server.serverServiceRate)
-            heapq.heappush(self.event_queue, Request(self.current_time + service_time, "departure", server))
+            heapq.heappush(self.event_queue, Request(self.current_time + service_time, False, server))
             self.total_service_time += service_time
         else:
             server.is_busy = False
@@ -103,10 +100,10 @@ class Simulator:
                 return self.servers[i]
 
     def get_results(self):
-        total_requests = self.requests_served + self.requests_dropped
+        total_requests = self.requests_served + self.requests_thrown 
         avg_wait_time = self.total_wait_time / self.requests_served if self.requests_served > 0 else 0
         avg_service_time = self.total_service_time / self.requests_served if self.requests_served > 0 else 0
-        return (self.requests_served, self.requests_dropped, self.current_time, avg_wait_time, avg_service_time)
+        return (self.requests_served, self.requests_thrown , self.current_time, avg_wait_time, avg_service_time,avg_wait_time+avg_service_time)
 
 def main():
     if len(sys.argv) < 7:
